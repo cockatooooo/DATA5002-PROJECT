@@ -1,0 +1,275 @@
+---
+title: "DATA5002 Project"
+author: "HONGQING YU"
+date: "2024-11-12"
+output: html_document
+---
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+library(ggplot2)
+library(plotly)
+library(DT)
+library(reshape2)
+library(crosstalk)
+library(dplyr)
+```
+
+## Main factors of diabetes and how to reduce the possibility of diabetes by controlling BMI
+### Heatmap of all variables in the Diabetes Dataset
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+diabetes_data <- read.csv("diabetes_dataset.csv", header = TRUE)
+diabetes_data <- diabetes_data[diabetes_data$BMI != 0, ]
+
+heatmap_data <- cor(diabetes_data)
+ggplot(melt(heatmap_data), aes(Var1, Var2, fill = value)) + 
+    geom_tile() +
+    theme_minimal() 
+```
+
+### Boxplot of Glucose by Outcome
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+diabetes_data$Outcome <- as.factor(diabetes_data$Outcome)
+
+plot_ly(data = diabetes_data, 
+               x = ~Outcome,
+               y = ~Glucose,
+               type = 'box',
+               color = ~Outcome,
+               colors = c("#6A9ACE","#715EA9"),
+               boxmean = TRUE,
+               boxpoints = 'all',  
+               jitter = 0.3,       
+               line = list(color = 'royalblue2'))
+
+
+```
+
+
+### Density Plot of Family History by Outcome
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+#diabetes&faminly history
+
+ggplot(diabetes_data, aes(x = DiabetesPedigreeFunction, fill = Outcome)) +
+  geom_density(alpha = 0.5) +
+  labs(x = "Family History", y = "Density", fill = "Outcome") +
+  theme_bw() +
+  theme(panel.border = element_blank())
+
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+# fig <- plot_ly(data = diabetes_data, 
+#                x = ~DiabetesPedigreeFunction, 
+#                color = ~Outcome, 
+#                colors = c("salmon", "lightseagreen"),
+#                type = 'histogram', 
+#                histnorm = 'density', 
+#                opacity = 0.8) %>%
+#   layout(title = 'Density Plot of Family History by Outcome',
+#          xaxis = list(title = 'Family History'),
+#          yaxis = list(title = 'Density'),
+#          barmode = 'overlay')
+# 
+# fig
+
+```
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+diabetes_data$age_group <- cut(
+  diabetes_data$Age,
+  breaks = c(seq(21, 71, by = 10), Inf),
+  right = FALSE,
+  labels = c("21-31", "32-41", "42-51", "52-61", "62-71", "72-81")
+)
+
+diabetes_data$BMI_group <- cut(
+  diabetes_data$BMI,
+  breaks = c(-Inf, 18.5, 25, 30, 40, Inf),  
+  labels = c("Under Weight", "Normal", "Overweight", "Obese", "Extremely Obese"),  
+  right = FALSE  
+)
+diabetes_data$preg_group <- cut(
+  diabetes_data$Pregnancies,
+  breaks = c(0, 4, 8, 12, Inf),  
+  labels = c("None-3 children", "4-7 children", "8-11 children", "More than 11 children"),  
+  right = FALSE  
+)
+
+```
+
+### Outcome Count by Age, BMI Level and Number of Children
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+diabetes_data2 <- diabetes_data %>%
+  group_by(Outcome, age_group, BMI_group, preg_group) %>%
+  summarise(count = n(), .groups = "drop")
+
+diabetes_data2 <- diabetes_data2 %>%
+  mutate(if_diabetes = ifelse(Outcome == 1, "diabetes", "healthy"))
+
+d <- SharedData$new(diabetes_data2)
+bscols(
+  widths = c(2, NA),
+  list(
+    filter_checkbox("age_group", "Age Group", d, ~age_group, inline = FALSE),
+    filter_select("BMI_group", "BMI Group", d, ~BMI_group, multiple = FALSE)
+  ),
+  list(
+    plot_ly(d, x = ~Outcome, y = ~count, type = "bar", color = ~preg_group)%>%
+      layout(
+        #title = "Outcome Count by Age, BMI and Number of Children",
+        xaxis = list(type = "category", title = "Outcome"),
+        yaxis = list(title = "Count")
+      )
+  )
+)
+
+
+
+```
+
+
+
+
+##                                           
+##       
+
+
+
+
+### BMI Level Distribution and Gender
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+obesity_data <- read.csv("obesity_level.csv", header = TRUE)
+obesity_data <- obesity_data %>%
+  rename(Level = X0be1dad)
+
+#level&gender
+obesity_data2 <- obesity_data %>%
+  group_by(Gender, Level) %>%
+  summarise(count = n(), .groups = "drop")
+d1 <- SharedData$new(obesity_data2)
+
+bscols(
+  widths = c(2, NA), 
+  list(
+    filter_checkbox("gender", "Gender", d1, ~Gender, inline = FALSE)
+  ),
+  list(
+    plot_ly(d1, 
+            labels = ~Level, 
+            values = ~count,      
+            type = 'pie',
+            colors = "Set1") %>%
+    layout(
+           #title = "Obesity Level Distribution",
+           showlegend = TRUE)
+  )
+)
+```
+
+
+### Obesity Level Distribution and Family History
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+
+#level&Consumption of alcohol
+obesity_data3 <- obesity_data %>%
+  group_by(Level, CALC, family_history_with_overweight) %>%
+  summarise(count = n(), .groups = "drop")
+d2 <- SharedData$new(obesity_data3)
+
+bscols(
+  widths = c(2, NA), 
+  list(
+    filter_checkbox("family_history_with_overweight", "family history", d2, ~family_history_with_overweight, inline = FALSE),
+    filter_select("CALC", "Consumption of alcohol", d2, ~CALC, multiple = FALSE)
+  ),
+  list(
+    plot_ly(d2, 
+            labels = ~Level, 
+            values = ~count,      
+            type = 'pie',
+            colors = "Set1") %>%
+    layout(
+           #title = "Obesity Level Distribution",
+           showlegend = TRUE)
+  )
+)
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+### Outcome Count by BMI Level and Trip Mode
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+#level&trip mode
+obesity_data3 <- obesity_data %>%
+  group_by(Level, MTRANS) %>%
+  summarise(count = n(), .groups = "drop")
+
+plot_ly(obesity_data3, x = ~Level, y = ~count, color = ~MTRANS, type = "bar")
+
+```
+
+### Scatter Plot for Height and Weight
+    This scatter plot shows the interval where each weight category is located distictly. You can bring in your own height and weight to determine your range.
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+
+fig <- plot_ly(data = obesity_data, 
+               x = ~Height, 
+               y = ~Weight, 
+               color = ~Level, 
+               colors = "Set1", 
+               opacity = 0.8, 
+               type = 'scatter',        
+               mode = 'markers')        
+
+fig
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
